@@ -11,6 +11,7 @@ import android.net.NetworkRequest
 import android.os.Build
 import androidx.core.content.getSystemService
 import com.follow.clash.core.Core
+import com.follow.clash.service.OnDemandDiagnostics
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -78,8 +79,10 @@ class NetworkObserveModule(private val service: Service) : Module() {
 
 
     override fun onInstall() {
+        OnDemandDiagnostics.record("network observe module installed")
         onUpdateNetwork()
         connectivity?.registerNetworkCallback(request, callback)
+        OnDemandDiagnostics.record("network observe callback registered")
     }
 
     @Synchronized
@@ -118,6 +121,10 @@ class NetworkObserveModule(private val service: Service) : Module() {
         if (dnsList == preDnsList) {
             return
         }
+        OnDemandDiagnostics.record(
+            "dns update from=${preDnsList.joinToString("|").ifBlank { "empty" }} " +
+                    "to=${dnsList.joinToString("|").ifBlank { "empty" }}"
+        )
         preDnsList = dnsList
         Core.updateDNS(dnsList.toSet().joinToString(","))
     }
@@ -129,6 +136,7 @@ class NetworkObserveModule(private val service: Service) : Module() {
     }
 
     override fun onUninstall() {
+        OnDemandDiagnostics.record("network observe module uninstalled")
         connectivity?.unregisterNetworkCallback(callback)
         updateJob?.cancel()
         updateJob = null

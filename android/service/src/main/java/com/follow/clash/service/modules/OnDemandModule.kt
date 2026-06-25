@@ -15,6 +15,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.getSystemService
 import com.follow.clash.common.GlobalState
 import com.follow.clash.core.Core
+import com.follow.clash.service.OnDemandDiagnostics
 import com.follow.clash.service.State
 import com.follow.clash.service.VpnService
 import com.google.gson.Gson
@@ -55,29 +56,47 @@ class OnDemandModule(private val service: Service) : Module() {
 
     private val callback = object : ConnectivityManager.NetworkCallback() {
         override fun onAvailable(network: Network) {
-            scheduleUpdate()
+            OnDemandDiagnostics.recordThrottled(
+                "wifi-onAvailable",
+                "wifi callback onAvailable network=$network"
+            )
+            scheduleUpdate(reason = "onAvailable")
         }
 
         override fun onCapabilitiesChanged(
             network: Network,
             networkCapabilities: NetworkCapabilities
         ) {
-            scheduleUpdate(networkCapabilities)
+            OnDemandDiagnostics.recordThrottled(
+                "wifi-onCapabilitiesChanged",
+                "wifi callback onCapabilitiesChanged network=$network"
+            )
+            scheduleUpdate(networkCapabilities, reason = "onCapabilitiesChanged")
         }
 
         override fun onLinkPropertiesChanged(
             network: Network,
             linkProperties: android.net.LinkProperties
         ) {
-            scheduleUpdate()
+            OnDemandDiagnostics.recordThrottled(
+                "wifi-onLinkPropertiesChanged",
+                "wifi callback onLinkPropertiesChanged network=$network"
+            )
+            scheduleUpdate(reason = "onLinkPropertiesChanged")
         }
 
         override fun onLost(network: Network) {
-            scheduleUpdate()
+            OnDemandDiagnostics.recordThrottled(
+                "wifi-onLost",
+                "wifi callback onLost network=$network"
+            )
+            scheduleUpdate(reason = "onLost")
         }
     }
 
     override fun onInstall() {
+        OnDemandDiagnostics.init(service.applicationContext)
+        OnDemandDiagnostics.record("on-demand module installed")
         scope.launch {
             State.onDemandExcludeSSIDsFlow.collectLatest {
                 updateRules(it.toSet())
@@ -86,12 +105,14 @@ class OnDemandModule(private val service: Service) : Module() {
     }
 
     override fun onUninstall() {
+        OnDemandDiagnostics.record("on-demand module uninstalled")
         unregisterCallback()
         updateJob?.cancel()
         scope.cancel()
     }
 
     private fun updateRules(excludeSSIDs: Set<String>) {
+        OnDemandDiagnostics.record("on-demand rules updated count=${excludeSSIDs.size}")
         if (excludeSSIDs.isEmpty()) {
             unregisterCallback()
             updateJob?.cancel()
@@ -102,7 +123,7 @@ class OnDemandModule(private val service: Service) : Module() {
             return
         }
         registerCallback()
-        scheduleUpdate()
+        scheduleUpdate(reason = "rulesUpdated")
     }
 
     private fun registerCallback() {
@@ -113,8 +134,10 @@ class OnDemandModule(private val service: Service) : Module() {
         runCatching {
             manager.registerNetworkCallback(request, callback)
             isCallbackRegistered = true
+            OnDemandDiagnostics.record("wifi callback registered")
         }.onFailure {
             GlobalState.log("On-demand network callback register failed: ${it.message}")
+            OnDemandDiagnostics.record("wifi callback register failed: ${it.message}")
         }
     }
 
@@ -126,17 +149,18 @@ class OnDemandModule(private val service: Service) : Module() {
             connectivity?.unregisterNetworkCallback(callback)
         }
         isCallbackRegistered = false
+        OnDemandDiagnostics.record("wifi callback unregistered")
     }
 
-    private fun scheduleUpdate(capabilities: NetworkCapabilities? = null) {
+    private fun scheduleUpdate(capabilities: NetworkCapabilities? = null, reason: String) {
         updateJob?.cancel()
         updateJob = scope.launch {
             delay(1500)
-            update(capabilities)
+            update(capabilities, reason)
         }
     }
 
-    private fun update(capabilities: NetworkCapabilities?) {
+    private fun update(capabilities: NetworkCapabilities?, reason: String) {
         val excludeSSIDs = State.onDemandExcludeSSIDsFlow.value.toSet()
         if (excludeSSIDs.isEmpty()) {
             currentWifiSnapshot = null
@@ -155,6 +179,10 @@ class OnDemandModule(private val service: Service) : Module() {
             "On-demand SSID: ${wifiSnapshot.ssid ?: "unknown"}, " +
                     "validated: ${wifiSnapshot.validated}, suspended: $shouldSuspend"
         )
+        OnDemandDiagnostics.record(
+            "ssid update reason=$reason ssid=${wifiSnapshot.ssid ?: "unknown"} " +
+                    "validated=${wifiSnapshot.validated} shouldSuspend=$shouldSuspend"
+        )
         setCoreSuspended(shouldSuspend)
     }
 
@@ -162,6 +190,7 @@ class OnDemandModule(private val service: Service) : Module() {
         if (!hasLocationPermission()) {
             if (!locationPermissionWarningLogged) {
                 GlobalState.log("On-demand SSID unavailable: location permission missing")
+                OnDemandDiagnostics.record("ssid unavailable: location permission missing")
                 locationPermissionWarningLogged = true
             }
             return WifiSnapshot(null, validated = false)
@@ -232,6 +261,7 @@ class OnDemandModule(private val service: Service) : Module() {
             ) == PackageManager.PERMISSION_GRANTED
             if (!backgroundGranted && !backgroundPermissionWarningLogged) {
                 GlobalState.log("On-demand SSID may be unavailable in background: background location permission missing")
+                OnDemandDiagnostics.record("ssid may be unavailable: background location missing")
                 backgroundPermissionWarningLogged = true
             }
         }
@@ -242,6 +272,7 @@ class OnDemandModule(private val service: Service) : Module() {
         if (suspended == next) {
             return
         }
+        OnDemandDiagnostics.record("set core suspended=$next previous=$suspended")
         suspended = next
         if (service is VpnService) {
             service.setOnDemandSuspended(next)
@@ -259,6 +290,7 @@ class OnDemandModule(private val service: Service) : Module() {
         )
         Core.invokeAction(data) {
             GlobalState.log("On-demand $method result: $it")
+            OnDemandDiagnostics.record("core action $method result=$it")
         }
     }
 }

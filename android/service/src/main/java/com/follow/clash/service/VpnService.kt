@@ -51,10 +51,13 @@ class VpnService : SystemVpnService(), IBaseService,
 
     override fun onCreate() {
         super.onCreate()
+        OnDemandDiagnostics.init(applicationContext)
+        OnDemandDiagnostics.record("vpn service created")
         handleCreate()
     }
 
     override fun onDestroy() {
+        OnDemandDiagnostics.record("vpn service destroyed")
         handleDestroy()
         super.onDestroy()
     }
@@ -243,25 +246,37 @@ class VpnService : SystemVpnService(), IBaseService,
             options.dns
         )
         isTunStarted = true
+        OnDemandDiagnostics.record(
+            "tun started stack=${options.stack} ipv6=${options.ipv6} " +
+                    "systemProxy=${options.systemProxy} allowBypass=${options.allowBypass}"
+        )
     }
 
     private fun startTun() {
         if (isTunStarted || isOnDemandSuspended) {
+            OnDemandDiagnostics.record(
+                "skip start TUN isTunStarted=$isTunStarted " +
+                        "isOnDemandSuspended=$isOnDemandSuspended"
+            )
             return
         }
         State.options?.let {
             GlobalState.log("VpnService start TUN")
+            OnDemandDiagnostics.record("start TUN requested")
             handleStart(it)
         }
     }
 
     private fun stopTun() {
         if (!isTunStarted) {
+            OnDemandDiagnostics.record("skip stop TUN isTunStarted=false")
             return
         }
         GlobalState.log("VpnService stop TUN")
+        OnDemandDiagnostics.record("stop TUN requested")
         Core.stopTun()
         isTunStarted = false
+        OnDemandDiagnostics.record("tun stopped")
     }
 
     private fun invokeCore(method: String, onResult: (() -> Unit)? = null) {
@@ -273,6 +288,7 @@ class VpnService : SystemVpnService(), IBaseService,
         )
         Core.invokeAction(data) {
             GlobalState.log("VpnService $method result: $it")
+            OnDemandDiagnostics.record("vpn service core action $method result=$it")
             onResult?.invoke()
         }
     }
@@ -284,6 +300,9 @@ class VpnService : SystemVpnService(), IBaseService,
         isOnDemandSuspended = next
         State.onDemandSuspendedFlow.value = next
         GlobalState.log("VpnService on-demand suspended: $next")
+        OnDemandDiagnostics.record(
+            "vpn on-demand suspended=$next isTunStarted=$isTunStarted"
+        )
         if (next) {
             stopTun()
             invokeCore("stopListener")
@@ -296,23 +315,30 @@ class VpnService : SystemVpnService(), IBaseService,
 
     override fun start() {
         try {
+            OnDemandDiagnostics.record("vpn service start requested isLoaded=$isLoaded")
             if (!isLoaded) {
                 loader.load()
                 isLoaded = true
+                OnDemandDiagnostics.record("vpn modules loaded")
             }
             startTun()
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            OnDemandDiagnostics.record("vpn service start failed: ${e.message}")
             stop()
         }
     }
 
     override fun stop() {
+        OnDemandDiagnostics.record(
+            "vpn service stop requested isLoaded=$isLoaded isTunStarted=$isTunStarted"
+        )
         isOnDemandSuspended = false
         State.onDemandSuspendedFlow.value = false
         stopTun()
         if (isLoaded) {
             loader.cancel()
             isLoaded = false
+            OnDemandDiagnostics.record("vpn modules unloaded")
         }
         stopSelf()
     }

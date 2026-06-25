@@ -32,13 +32,13 @@ import kotlinx.coroutines.withContext
 import java.nio.charset.Charset
 import kotlin.reflect.KClass
 
-//fun Context.startForegroundServiceCompat(intent: Intent?) {
-//    if (Build.VERSION.SDK_INT >= 26) {
-//        startForegroundService(intent)
-//    } else {
-//        startService(intent)
-//    }
-//}
+fun Context.startForegroundServiceCompat(intent: Intent?) {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        startForegroundService(intent)
+    } else {
+        startService(intent)
+    }
+}
 
 val KClass<*>.intent: Intent
     get() = Intent(GlobalState.application, this.java)

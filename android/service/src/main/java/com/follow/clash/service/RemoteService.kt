@@ -7,6 +7,7 @@ import com.follow.clash.common.GlobalState
 import com.follow.clash.common.ServiceDelegate
 import com.follow.clash.common.chunkedForAidl
 import com.follow.clash.common.intent
+import com.follow.clash.common.startForegroundServiceCompat
 import com.follow.clash.core.Core
 import com.follow.clash.service.State.delegate
 import com.follow.clash.service.State.intent
@@ -55,6 +56,7 @@ class RemoteService : Service(),
                     true -> VpnService::class.intent
                     false -> CommonService::class.intent
                 }
+                GlobalState.application.startForegroundServiceCompat(nextIntent)
                 if (intent != nextIntent) {
                     delegate?.unbind()
                     delegate = ServiceDelegate(nextIntent, ::handleServiceDisconnected) { binder ->

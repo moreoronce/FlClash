@@ -27,7 +27,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
@@ -50,9 +50,8 @@ class NotificationModule(private val service: Service) : Module() {
 
     @OptIn(ExperimentalCoroutinesApi::class)
     override fun onInstall() {
+        update(State.notificationParamsFlow.value?.extended ?: NotificationParams().extended)
         scope.launch {
-            update(State.notificationParamsFlow.value?.extended ?: NotificationParams().extended)
-
             val screenFlow = service.receiveBroadcastFlow {
                 addAction(Intent.ACTION_SCREEN_ON)
                 addAction(Intent.ACTION_SCREEN_OFF)
@@ -62,18 +61,27 @@ class NotificationModule(private val service: Service) : Module() {
                 emit(isScreenOn())
             }
 
-            val statusTickerFlow = State.onDemandSuspendedFlow.flatMapLatest { suspended ->
-                tickerFlow(if (suspended) 15000 else 1000, 0)
+            val statusTickerFlow = combine(
+                State.onDemandSuspendedFlow, screenFlow
+            ) { suspended, screenOn ->
+                suspended to screenOn
+            }.flatMapLatest { (suspended, screenOn) ->
+                if (screenOn) {
+                    tickerFlow(if (suspended) 15000 else 1000, 0)
+                } else {
+                    emptyFlow()
+                }
             }
 
             combine(
-                statusTickerFlow, State.notificationParamsFlow, screenFlow
-            ) { _, params, screenOn ->
-                params?.extended to screenOn
-            }.filter { (params, screenOn) -> params != null && screenOn }
-                .distinctUntilChanged { old, new -> old.first == new.first && old.second == new.second }
-                .collect { (params, _) ->
-                    update(params!!)
+                statusTickerFlow, State.notificationParamsFlow
+            ) { _, params ->
+                params?.extended
+            }.distinctUntilChanged()
+                .collect { params ->
+                    if (params != null) {
+                        update(params)
+                    }
                 }
         }
     }

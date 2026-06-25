@@ -12,6 +12,7 @@ object OnDemandDiagnostics {
     private const val TAG = "FlClashOnDemand"
     private const val FILE_NAME = "on-demand-diagnostics.log"
     private const val MAX_ENTRIES = 200
+    private const val DEFAULT_THROTTLE_INTERVAL_MILLIS = 30000L
 
     private val entries = ArrayDeque<String>(MAX_ENTRIES)
     private val throttledAt = mutableMapOf<String, Long>()
@@ -35,16 +36,25 @@ object OnDemandDiagnostics {
         val line = "${formatter.format(Date())} $message"
         if (entries.size >= MAX_ENTRIES) {
             entries.removeFirst()
-        }
-        entries.addLast(line)
-        runCatching {
-            file?.writeText(entries.joinToString(separator = "\n", postfix = "\n"))
+            entries.addLast(line)
+            runCatching {
+                file?.writeText(entries.joinToString(separator = "\n", postfix = "\n"))
+            }
+        } else {
+            entries.addLast(line)
+            runCatching {
+                file?.appendText("$line\n")
+            }
         }
         Log.i(TAG, line)
     }
 
     @Synchronized
-    fun recordThrottled(key: String, message: String, intervalMillis: Long = 2000L) {
+    fun recordThrottled(
+        key: String,
+        message: String,
+        intervalMillis: Long = DEFAULT_THROTTLE_INTERVAL_MILLIS
+    ) {
         val now = System.currentTimeMillis()
         val previous = throttledAt[key] ?: 0L
         if (now - previous < intervalMillis) {

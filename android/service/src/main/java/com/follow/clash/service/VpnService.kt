@@ -324,6 +324,7 @@ class VpnService : SystemVpnService(), IBaseService,
             startTun()
         } catch (e: Exception) {
             OnDemandDiagnostics.record("vpn service start failed: ${e.message}")
+            GlobalState.log("VpnService start failed: ${e.message}")
             stop()
         }
     }

@@ -2,6 +2,7 @@ package com.follow.clash.service
 
 import android.content.Intent
 import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.net.ProxyInfo
 import android.os.Binder
 import android.os.Build
@@ -25,6 +26,9 @@ import com.follow.clash.service.modules.moduleLoader
 import com.google.gson.Gson
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.util.UUID
 import java.net.InetSocketAddress
 import android.net.VpnService as SystemVpnService
@@ -48,6 +52,7 @@ class VpnService : SystemVpnService(), IBaseService,
     private var isTunStarted = false
     @Volatile
     private var isOnDemandSuspended = false
+    private var tunWatchdogJob: Job? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -58,6 +63,7 @@ class VpnService : SystemVpnService(), IBaseService,
 
     override fun onDestroy() {
         OnDemandDiagnostics.record("vpn service destroyed")
+        stopTunWatchdog()
         handleDestroy()
         super.onDestroy()
     }
@@ -253,12 +259,28 @@ class VpnService : SystemVpnService(), IBaseService,
     }
 
     private fun startTun() {
-        if (isTunStarted || isOnDemandSuspended) {
+        if (isOnDemandSuspended) {
             OnDemandDiagnostics.record(
                 "skip start TUN isTunStarted=$isTunStarted " +
                         "isOnDemandSuspended=$isOnDemandSuspended"
             )
             return
+        }
+        if (isTunStarted) {
+            if (hasActiveSystemVpn()) {
+                OnDemandDiagnostics.record(
+                    "skip start TUN isTunStarted=true systemVpnActive=true"
+                )
+                return
+            }
+            GlobalState.log("VpnService TUN state drift detected, restarting TUN")
+            OnDemandDiagnostics.record("tun state drift detected; restarting TUN")
+            runCatching {
+                Core.stopTun()
+            }.onFailure {
+                OnDemandDiagnostics.record("stop stale TUN failed: ${it.message}")
+            }
+            isTunStarted = false
         }
         State.options?.let {
             GlobalState.log("VpnService start TUN")
@@ -277,6 +299,42 @@ class VpnService : SystemVpnService(), IBaseService,
         Core.stopTun()
         isTunStarted = false
         OnDemandDiagnostics.record("tun stopped")
+    }
+
+    private fun hasActiveSystemVpn(): Boolean {
+        return connectivity?.allNetworks
+            ?.asSequence()
+            ?.mapNotNull { connectivity?.getNetworkCapabilities(it) }
+            ?.any { it.hasTransport(NetworkCapabilities.TRANSPORT_VPN) } == true
+    }
+
+    private fun startTunWatchdog() {
+        if (tunWatchdogJob?.isActive == true) {
+            return
+        }
+        tunWatchdogJob = launch {
+            while (true) {
+                delay(TUN_WATCHDOG_INTERVAL_MILLIS)
+                if (!isLoaded || isOnDemandSuspended) {
+                    continue
+                }
+                if (!hasActiveSystemVpn()) {
+                    GlobalState.log("VpnService watchdog restoring missing VPN")
+                    OnDemandDiagnostics.record("watchdog restoring missing VPN")
+                    runCatching {
+                        startTun()
+                    }.onFailure {
+                        GlobalState.log("VpnService watchdog restore failed: ${it.message}")
+                        OnDemandDiagnostics.record("watchdog restore failed: ${it.message}")
+                    }
+                }
+            }
+        }
+    }
+
+    private fun stopTunWatchdog() {
+        tunWatchdogJob?.cancel()
+        tunWatchdogJob = null
     }
 
     private fun invokeCore(method: String, onResult: (() -> Unit)? = null) {
@@ -321,6 +379,7 @@ class VpnService : SystemVpnService(), IBaseService,
                 isLoaded = true
                 OnDemandDiagnostics.record("vpn modules loaded")
             }
+            startTunWatchdog()
             startTun()
         } catch (e: Exception) {
             OnDemandDiagnostics.record("vpn service start failed: ${e.message}")
@@ -335,6 +394,7 @@ class VpnService : SystemVpnService(), IBaseService,
         )
         isOnDemandSuspended = false
         State.onDemandSuspendedFlow.value = false
+        stopTunWatchdog()
         stopTun()
         if (isLoaded) {
             loader.cancel()
@@ -351,5 +411,6 @@ class VpnService : SystemVpnService(), IBaseService,
         private const val DNS6 = "fdfe:dcba:9876::2"
         private const val NET_ANY = "0.0.0.0"
         private const val NET_ANY6 = "::"
+        private const val TUN_WATCHDOG_INTERVAL_MILLIS = 60000L
     }
 }

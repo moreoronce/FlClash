@@ -1,50 +1,51 @@
-<div>
+# FlClash Android On-Demand Fork
 
 [**简体中文**](README_zh_CN.md)
 
-</div>
+[![License](https://img.shields.io/github/license/moreoronce/FlClash?style=flat-square)](LICENSE)
+[![Upstream](https://img.shields.io/badge/upstream-chen08209%2FFlClash-blue?style=flat-square)](https://github.com/chen08209/FlClash)
 
-## FlClash
+This repository is a focused fork of [chen08209/FlClash](https://github.com/chen08209/FlClash). The upstream project is a multi-platform ClashMeta/mihomo client for Android, Windows, macOS, and Linux. This fork keeps that base, but the active branch is tuned for one main use case: more reliable Android on-demand VPN behavior around Wi-Fi SSID changes.
 
-[![Downloads](https://img.shields.io/github/downloads/chen08209/FlClash/total?style=flat-square&logo=github)](https://github.com/chen08209/FlClash/releases/)[![Last Version](https://img.shields.io/github/release/chen08209/FlClash/all.svg?style=flat-square)](https://github.com/chen08209/FlClash/releases/)[![License](https://img.shields.io/github/license/chen08209/FlClash?style=flat-square)](LICENSE)
+Use upstream FlClash if you want the general-purpose release channel. Use this fork if you are testing or developing the Android on-demand VPN changes described below.
 
-[![Channel](https://img.shields.io/badge/Telegram-Channel-blue?style=flat-square&logo=telegram)](https://t.me/FlClash)
+## What This Fork Changes
 
-A multi-platform proxy client based on ClashMeta, simple and easy to use, open-source and ad-free.
-
-on Desktop:
-<p style="text-align: center;">
-    <img alt="desktop" src="snapshots/desktop.gif">
-</p>
-
-on Mobile:
-<p style="text-align: center;">
-    <img alt="mobile" src="snapshots/mobile.gif">
-</p>
-
-## Features
-
-✈️ Multi-platform: Android, Windows, macOS and Linux
-
-💻 Adaptive multiple screen sizes, Multiple color themes available
-
-💡 Based on Material You Design, [Surfboard](https://github.com/getsurfboard/surfboard)-like UI
-
-☁️ Supports data sync via WebDAV
-
-✨ Support subscription link, Dark mode
-
-## Android branch notes
-
-This fork branch focuses on Android-only usage and includes the following changes:
-
-- Improves on-demand VPN handling for Wi-Fi SSID changes. The Android service now observes network changes natively, deduplicates SSID state changes, and only suspends VPN when the excluded SSID is connected and validated.
-- Keeps `VpnService` alive as a foreground service while on-demand mode is suspended, so leaving the excluded SSID can resume VPN without reopening the app.
-- Reduces background work by pausing traffic, logs, and connection refreshes when the UI is not in the foreground, throttling suspended-state notifications, and deduplicating DNS updates.
+- Improves Android on-demand VPN handling when Wi-Fi SSID changes. The Android service observes network changes natively, deduplicates SSID transitions, and only suspends VPN after the excluded SSID is connected and validated.
+- Keeps `VpnService` running as a foreground service while on-demand mode is suspended, so VPN can resume after leaving the excluded SSID without reopening the app.
+- Restores VPN when the TUN state drifts away from the expected suspended or active state.
+- Adds Android on-demand diagnostics to make SSID, network, and VPN state easier to inspect while debugging.
+- Reduces background work when the UI is not in the foreground by pausing traffic, logs, and connection refreshes, throttling suspended-state notifications, and deduplicating DNS updates.
 - Updates the bundled mihomo core through the `core/Clash.Meta` submodule to a branch based on upstream `v1.19.27`.
-- Narrows Android build output toward `android-arm64` for smaller and faster local Android-only builds.
+- Narrows local Android build output toward `android-arm64` for faster Android-only development and testing.
 
-Validation performed on this branch:
+## Inherited From Upstream
+
+- ClashMeta/mihomo-based proxy core.
+- Android, Windows, macOS, and Linux app targets.
+- Material You design with a Surfboard-like UI.
+- Subscription import, rule/profile management, dark mode, and WebDAV sync.
+- Desktop process-mode core integration and Android FFI/lib-mode core integration.
+
+Desktop platforms are still present in the source tree, but this fork branch has not been optimized or validated as a desktop release branch.
+
+## Preview
+
+Desktop:
+
+<p align="center">
+  <img alt="FlClash desktop preview" src="snapshots/desktop.gif">
+</p>
+
+Mobile:
+
+<p align="center">
+  <img alt="FlClash mobile preview" src="snapshots/mobile.gif">
+</p>
+
+## Current Validation
+
+The Android-focused branch has been validated with:
 
 ```bash
 go test ./...
@@ -52,101 +53,83 @@ plugins/setup/buildkit/run_build_tool.cmd android --arch arm64
 cd android && ./gradlew.bat :app:assembleDebug
 ```
 
-The debug APK was installed on a real Android device for a smoke test. The app, remote process, and foreground `VpnService` started successfully without crash or ANR in logcat / exit-info.
-
-## Use
-
-### Linux
-
-⚠️ Make sure to install the following dependencies before using them
-
-   ```bash
-    sudo apt-get install libayatana-appindicator3-dev
-    sudo apt-get install libkeybinder-3.0-dev
-   ```
-
-### Android
-
-Support the following actions
-
-   ```bash
-    com.follow.clash.action.START
-    
-    com.follow.clash.action.STOP
-    
-    com.follow.clash.action.TOGGLE
-   ```
+The debug APK was installed on a real Android device for a smoke test. The app process, remote process, and foreground `VpnService` started successfully, with no crash or ANR observed in logcat or Android exit-info during that smoke test.
 
 ## Download
 
-<a href="https://chen08209.github.io/FlClash-fdroid-repo/repo?fingerprint=789D6D32668712EF7672F9E58DEEB15FBD6DCEEC5AE7A4371EA72F2AAE8A12FD"><img alt="Get it on F-Droid" src="snapshots/get-it-on-fdroid.svg" width="200px"/></a> <a href="https://github.com/chen08209/FlClash/releases"><img alt="Get it on GitHub" src="snapshots/get-it-on-github.svg" width="200px"/></a>
+For normal end-user releases, prefer upstream FlClash:
 
-## Build
+<a href="https://chen08209.github.io/FlClash-fdroid-repo/repo?fingerprint=789D6D32668712EF7672F9E58DEEB15FBD6DCEEC5AE7A4371EA72F2AAE8A12FD"><img alt="Get it on F-Droid" src="snapshots/get-it-on-fdroid.svg" width="200px"/></a>
+<a href="https://github.com/chen08209/FlClash/releases"><img alt="Get it on GitHub" src="snapshots/get-it-on-github.svg" width="200px"/></a>
 
-1. Update submodules
-   ```bash
-   git submodule update --init --recursive
-   ```
+This fork branch is primarily for source builds and Android behavior testing unless a fork-specific release is published.
 
-2. Install `Flutter` and `Golang` environment
+## Build From Source
 
-3. Build Application
+Initialize submodules first:
 
-    - android
+```bash
+git submodule update --init --recursive
+```
 
-        1. Install `Android SDK`, `Android NDK`
+Install the project toolchains:
 
-        2. Set `ANDROID_NDK` environment variable
+- Flutter matching the project constraints. FVM is recommended; Flutter `3.35.7` is the known-good version documented for this checkout.
+- Go for the ClashMeta/mihomo core.
+- Android SDK and Android NDK for Android builds.
+- GCC and Inno Setup for Windows packaging.
+- `appdmg` for macOS DMG packaging.
 
-        3. Run build script
+Fetch Flutter dependencies:
 
-           ```bash
-           dart setup.dart android
-           ```
+```bash
+fvm flutter pub get
+```
 
-    - windows
+Build the Android core and debug APK:
 
-        1. Requires a Windows client
+```bash
+plugins/setup/buildkit/run_build_tool.cmd android --arch arm64
+cd android
+./gradlew.bat :app:assembleDebug
+```
 
-        2. Install `GCC`, `Inno Setup`
+Run a full package build through the project setup script:
 
-        3. Run build script
+```bash
+dart setup.dart android
+dart setup.dart windows
+dart setup.dart linux
+dart setup.dart macos
+```
 
-           ```bash
-           dart setup.dart windows
-           ```
+On Linux, install these desktop dependencies if they are not already available:
 
-    - linux
+```bash
+sudo apt-get install -y libayatana-appindicator3-dev libkeybinder-3.0-dev
+```
 
-        1. Requires a Linux client
+## Android Integration Actions
 
-        2. Dependencies are auto-installed by setup script, or manually:
-           ```bash
-           sudo apt-get install -y libayatana-appindicator3-dev libkeybinder-3.0-dev
-           ```
+The Android app supports these external actions:
 
-        3. Run build script
+```text
+com.follow.clash.action.START
+com.follow.clash.action.STOP
+com.follow.clash.action.TOGGLE
+```
 
-           ```bash
-           dart setup.dart linux
-           ```
+## Development Notes
 
-    - macOS
+- Run `flutter test`, not `dart test`, for root package tests because some models pull in Flutter types.
+- After changing models, providers, or Drift database schema, regenerate code:
 
-        1. Requires a macOS client
+```bash
+dart run build_runner build --delete-conflicting-outputs
+```
 
-        2. Run build script
+- Root `flutter test` discovers the root package tests only. Plugin tests under `plugins/` need to be run by path or from the plugin package directory.
 
-           ```bash
-           dart setup.dart macos
-           ```
+## Credits
 
-## Star
-
-The easiest way to support developers is to click on the star (⭐) at the top of the page.
-
-<p style="text-align: center;">
-    <a href="https://api.star-history.com/svg?repos=chen08209/FlClash&Date">
-        <img alt="start" width=50% src="https://api.star-history.com/svg?repos=chen08209/FlClash&Date"/>
-    </a>
-</p>
+This fork builds on [FlClash](https://github.com/chen08209/FlClash), ClashMeta/mihomo, Flutter, and the related local plugins bundled in this repository. Upstream project license terms remain in [LICENSE](LICENSE).

@@ -1,50 +1,51 @@
-<div>
+# FlClash Android 按需 VPN Fork
 
 [**English**](README.md)
 
-</div>
+[![License](https://img.shields.io/github/license/moreoronce/FlClash?style=flat-square)](LICENSE)
+[![Upstream](https://img.shields.io/badge/upstream-chen08209%2FFlClash-blue?style=flat-square)](https://github.com/chen08209/FlClash)
 
-## FlClash
+这个仓库是 [chen08209/FlClash](https://github.com/chen08209/FlClash) 的一个定向 fork。上游 FlClash 是基于 ClashMeta/mihomo 的多平台代理客户端，支持 Android、Windows、macOS 和 Linux。这个 fork 保留上游基础，但当前活跃分支主要服务一个场景：改进 Android 上按 Wi-Fi SSID 自动挂起/恢复 VPN 的可靠性。
 
-[![Downloads](https://img.shields.io/github/downloads/chen08209/FlClash/total?style=flat-square&logo=github)](https://github.com/chen08209/FlClash/releases/)[![Last Version](https://img.shields.io/github/release/chen08209/FlClash/all.svg?style=flat-square)](https://github.com/chen08209/FlClash/releases/)[![License](https://img.shields.io/github/license/chen08209/FlClash?style=flat-square)](LICENSE)
+如果你需要通用、稳定的 FlClash 发布版本，建议使用上游发布渠道。如果你想测试或继续开发 Android 按需 VPN 行为，请看这个 fork。
 
-[![Channel](https://img.shields.io/badge/Telegram-Channel-blue?style=flat-square&logo=telegram)](https://t.me/FlClash)
+## 这个 Fork 改了什么
 
-基于ClashMeta的多平台代理客户端，简单易用，开源无广告。
-
-on Desktop:
-<p style="text-align: center;">
-    <img alt="desktop" src="snapshots/desktop.gif">
-</p>
-
-on Mobile:
-<p style="text-align: center;">
-    <img alt="mobile" src="snapshots/mobile.gif">
-</p>
-
-## Features
-
-✈️ 多平台: Android, Windows, macOS and Linux
-
-💻 自适应多个屏幕尺寸,多种颜色主题可供选择
-
-💡 基本 Material You 设计, 类[Surfboard](https://github.com/getsurfboard/surfboard)用户界面
-
-☁️ 支持通过WebDAV同步数据
-
-✨ 支持一键导入订阅, 深色模式
-
-## Android 分支说明
-
-这个 fork 分支主要面向仅 Android 使用的场景，包含以下改动：
-
-- 优化 Wi-Fi SSID 切换时的按需运行。Android 服务现在会在原生层监听网络变化，去重 SSID 状态变化，并且只在命中排除 SSID 且 Wi-Fi 已验证可用时挂起 VPN。
-- 按需挂起时继续保留 `VpnService` 前台服务，离开排除 SSID 后无需重新打开 App 也能恢复 VPN。
-- 降低后台工作量：UI 不在前台时暂停流量、日志、连接列表刷新；挂起状态下降低通知刷新频率；DNS 更新做去重。
+- 优化 Android 在 Wi-Fi SSID 变化时的按需 VPN 行为。Android 服务会在原生层监听网络变化，去重 SSID 状态变化，并且只在命中排除 SSID 且 Wi-Fi 已验证可用时挂起 VPN。
+- 按需模式挂起时继续保留 `VpnService` 前台服务，离开排除 SSID 后无需重新打开 App 也能恢复 VPN。
+- 当 TUN 状态偏离预期的挂起/运行状态时，主动恢复 VPN。
+- 增加 Android 按需运行诊断信息，方便调试 SSID、网络和 VPN 状态。
+- 降低后台工作量：UI 不在前台时暂停流量、日志和连接列表刷新；降低挂起状态通知刷新频率；DNS 更新做去重。
 - 通过 `core/Clash.Meta` 子模块把内置 mihomo core 升级到基于上游 `v1.19.27` 的分支。
-- Android 构建收敛到 `android-arm64`，适合只在 arm64 Android 真机上使用和调试。
+- 本地 Android 构建收敛到 `android-arm64`，更适合只面向 Android 真机的开发和测试。
 
-这个分支已经执行过以下验证：
+## 继承自上游的能力
+
+- 基于 ClashMeta/mihomo 的代理核心。
+- Android、Windows、macOS、Linux 多平台工程结构。
+- Material You 设计，以及类似 Surfboard 的交互风格。
+- 订阅导入、规则/配置管理、深色模式、WebDAV 同步。
+- 桌面端进程模式 core 集成，以及 Android 端 FFI/lib 模式 core 集成。
+
+桌面平台代码仍保留在工程中，但当前 fork 分支没有把桌面发布作为主要优化和验证目标。
+
+## 预览
+
+桌面端：
+
+<p align="center">
+  <img alt="FlClash desktop preview" src="snapshots/desktop.gif">
+</p>
+
+移动端：
+
+<p align="center">
+  <img alt="FlClash mobile preview" src="snapshots/mobile.gif">
+</p>
+
+## 当前验证情况
+
+这个 Android 分支已经执行过：
 
 ```bash
 go test ./...
@@ -52,101 +53,83 @@ plugins/setup/buildkit/run_build_tool.cmd android --arch arm64
 cd android && ./gradlew.bat :app:assembleDebug
 ```
 
-debug APK 已安装到 Android 真机做冒烟测试。App 主进程、remote 进程和前台 `VpnService` 均可正常启动，logcat / exit-info 未发现 crash 或 ANR。
+debug APK 已安装到 Android 真机做冒烟测试。App 主进程、remote 进程和前台 `VpnService` 均可正常启动；该次冒烟测试中，logcat 和 Android exit-info 未发现 crash 或 ANR。
 
-## Use
+## 下载
 
-### Linux
+普通用户安装建议优先使用上游 FlClash 发布渠道：
 
-⚠️ 使用前请确保安装以下依赖
+<a href="https://chen08209.github.io/FlClash-fdroid-repo/repo?fingerprint=789D6D32668712EF7672F9E58DEEB15FBD6DCEEC5AE7A4371EA72F2AAE8A12FD"><img alt="Get it on F-Droid" src="snapshots/get-it-on-fdroid.svg" width="200px"/></a>
+<a href="https://github.com/chen08209/FlClash/releases"><img alt="Get it on GitHub" src="snapshots/get-it-on-github.svg" width="200px"/></a>
 
-   ```bash
-    sudo apt-get install libayatana-appindicator3-dev
-    sudo apt-get install libkeybinder-3.0-dev
-   ```
+这个 fork 分支主要用于源码构建和 Android 行为测试，除非后续单独发布 fork 版本。
 
-### Android
+## 从源码构建
 
-支持下列操作
+先初始化子模块：
 
-   ```bash
-    com.follow.clash.action.START
-    
-    com.follow.clash.action.STOP
-    
-    com.follow.clash.action.TOGGLE
-   ```
+```bash
+git submodule update --init --recursive
+```
 
-## Download
+安装项目工具链：
 
-<a href="https://chen08209.github.io/FlClash-fdroid-repo/repo?fingerprint=789D6D32668712EF7672F9E58DEEB15FBD6DCEEC5AE7A4371EA72F2AAE8A12FD"><img alt="Get it on F-Droid" src="snapshots/get-it-on-fdroid.svg" width="200px"/></a> <a href="https://github.com/chen08209/FlClash/releases"><img alt="Get it on GitHub" src="snapshots/get-it-on-github.svg" width="200px"/></a>
+- Flutter，版本需匹配项目约束。推荐通过 FVM 使用；当前文档记录的已知可用版本是 Flutter `3.35.7`。
+- Go，用于构建 ClashMeta/mihomo core。
+- Android SDK 和 Android NDK，用于 Android 构建。
+- GCC 和 Inno Setup，用于 Windows 打包。
+- `appdmg`，用于 macOS DMG 打包。
 
-## Build
+获取 Flutter 依赖：
 
-1. 更新 submodules
-   ```bash
-   git submodule update --init --recursive
-   ```
+```bash
+fvm flutter pub get
+```
 
-2. 安装 `Flutter` 以及 `Golang` 环境
+构建 Android core 和 debug APK：
 
-3. 构建应用
+```bash
+plugins/setup/buildkit/run_build_tool.cmd android --arch arm64
+cd android
+./gradlew.bat :app:assembleDebug
+```
 
-    - android
+通过项目 setup 脚本执行完整打包：
 
-        1. 安装  `Android SDK` ,  `Android NDK`
+```bash
+dart setup.dart android
+dart setup.dart windows
+dart setup.dart linux
+dart setup.dart macos
+```
 
-        2. 设置 `ANDROID_NDK` 环境变量
+Linux 桌面端如果缺少依赖，可以先安装：
 
-        3. 运行构建脚本
+```bash
+sudo apt-get install -y libayatana-appindicator3-dev libkeybinder-3.0-dev
+```
 
-           ```bash
-           dart setup.dart android
-           ```
+## Android 外部控制 Action
 
-    - windows
+Android App 支持以下外部 action：
 
-        1. 你需要一个windows客户端
+```text
+com.follow.clash.action.START
+com.follow.clash.action.STOP
+com.follow.clash.action.TOGGLE
+```
 
-        2. 安装 `GCC`，`Inno Setup`
+## 开发备注
 
-        3. 运行构建脚本
+- 根包测试请使用 `flutter test`，不要用 `dart test`，因为部分模型会依赖 Flutter 类型。
+- 修改 models、providers 或 Drift 数据库 schema 后，需要重新生成代码：
 
-           ```bash
-           dart setup.dart windows
-           ```
+```bash
+dart run build_runner build --delete-conflicting-outputs
+```
 
-    - linux
+- 根目录 `flutter test` 默认只发现根包 `test/`。`plugins/` 下的插件测试需要显式传入路径，或进入插件包目录单独运行。
 
-        1. 你需要一个linux客户端
+## 致谢
 
-        2. 依赖会由 setup 脚本自动安装，也可以手动安装：
-           ```bash
-           sudo apt-get install -y libayatana-appindicator3-dev libkeybinder-3.0-dev
-           ```
-
-        3. 运行构建脚本
-
-           ```bash
-           dart setup.dart linux
-           ```
-
-    - macOS
-
-        1. 你需要一个macOS客户端
-
-        2. 运行构建脚本
-
-           ```bash
-           dart setup.dart macos
-           ```
-
-## Star
-
-支持开发者的最简单方式是点击页面顶部的星标（⭐）。
-
-<p style="text-align: center;">
-    <a href="https://api.star-history.com/svg?repos=chen08209/FlClash&Date">
-        <img alt="start" width=50% src="https://api.star-history.com/svg?repos=chen08209/FlClash&Date"/>
-    </a>
-</p>
+这个 fork 基于 [FlClash](https://github.com/chen08209/FlClash)、ClashMeta/mihomo、Flutter，以及仓库内相关本地插件继续开发。上游项目许可见 [LICENSE](LICENSE)。

@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
+import 'package:flutter/foundation.dart';
 
 mixin CoreInterface {
   Future<bool> init(InitParams params);
@@ -92,6 +93,9 @@ abstract class CoreHandlerInterface with CoreInterface {
         logLevel: LogLevel.error,
       );
       return null;
+    }
+    if (!kDebugMode) {
+      return invoke<T>(method: method, data: data, timeout: timeout);
     }
     return await utils.handleWatch(
       onStart: () {

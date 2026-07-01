@@ -67,7 +67,11 @@ class NotificationModule(private val service: Service) : Module() {
                 suspended to screenOn
             }.flatMapLatest { (suspended, screenOn) ->
                 if (screenOn) {
-                    tickerFlow(if (suspended) 15000 else 1000, 0)
+                    tickerFlow(
+                        if (suspended) SUSPENDED_UPDATE_INTERVAL_MILLIS
+                        else ACTIVE_UPDATE_INTERVAL_MILLIS,
+                        0
+                    )
                 } else {
                     emptyFlow()
                 }
@@ -136,5 +140,10 @@ class NotificationModule(private val service: Service) : Module() {
             service.stopForeground(true)
         }
         scope.cancel()
+    }
+
+    companion object {
+        private const val ACTIVE_UPDATE_INTERVAL_MILLIS = 5000L
+        private const val SUSPENDED_UPDATE_INTERVAL_MILLIS = 15000L
     }
 }
